@@ -21,6 +21,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -89,7 +90,7 @@ public class ClassLoaderBenchmark {
         public String benchmarkIdentifier;
 
         Class classToLoad;
-        String[] arguments;
+        Object[] arguments;
         Method main;
 
         @Param("NOTHING")
@@ -104,15 +105,17 @@ public class ClassLoaderBenchmark {
             Map<String, Object> currentBenchmark = (Map<String, Object>) currentBenchmark0;
             String jarPath = (String) currentBenchmark.get("jar-path");
             String mainClass = (String) currentBenchmark.get("main-class");
+
             classToLoad = loadClassFromJar(jarPath, mainClass);
             main = classToLoad.getDeclaredMethod("main", String[].class);
-            List<String> args = (List<String>) currentBenchmark.get("arguments");
+            List<Object> args = (List<Object>) currentBenchmark.get("arguments");
+            arguments = Arrays.copyOf(args.toArray(), args.size(), String[].class);
         }
     }
 
     @Benchmark
     public void runMain(BenchmarkState state) throws InvocationTargetException, IllegalAccessException {
-        state.main.invoke(null, (Object) state.arguments);
+        state.main.invoke(null, new String[][] {(String[]) state.arguments});
     }
 
     public static void main(String[] args) throws RunnerException, FileNotFoundException {
