@@ -21,6 +21,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 
 public class ClassLoaderBenchmark {
@@ -74,36 +75,38 @@ public class ClassLoaderBenchmark {
     }
 
     private static Map<String, Object> loadBenchmarkSpec(Path benchmarkSpecPath) throws FileNotFoundException {
-        FileInputStream fs = null;
-        fs = new FileInputStream(benchmarkSpecPath.toFile());
+        FileInputStream fs = new FileInputStream(benchmarkSpecPath.toFile());
         return loadBenchmarkSpec(fs);
     }
-
-    public static Map<String, Object> benchmarksInfo;
 
     // We have a state which contains the main class of the program
     @State(Scope.Benchmark)
     public static class BenchmarkState {
 
+        public static Map<String, Object> benchmarksInfo;
+
         @Param("FOP")
         public String benchmarkIdentifier;
 
-        public Map<String, Object> benchmarksInfo;
-
         Class classToLoad;
-        String[] arguments = new String[] {} ;
+        String[] arguments;
         Method main;
 
-        public BenchmarkState() {
-        }
+        @Param("NOTHING")
+        private String fileName;
+
+        public BenchmarkState() {}
 
         @Setup()
         public void doSetup() throws NoSuchMethodException, FileNotFoundException {
-            Map<String, String> currentBenchmark = (Map<String, String>) benchmarksInfo.get(benchmarkIdentifier);
-            String jarPath = currentBenchmark.get("jar-path");
-            String mainClass = currentBenchmark.get("main-class");
+            benchmarksInfo = loadBenchmarkSpec(Paths.get(fileName));
+            Object currentBenchmark0 = benchmarksInfo.get(benchmarkIdentifier);
+            Map<String, Object> currentBenchmark = (Map<String, Object>) currentBenchmark0;
+            String jarPath = (String) currentBenchmark.get("jar-path");
+            String mainClass = (String) currentBenchmark.get("main-class");
             classToLoad = loadClassFromJar(jarPath, mainClass);
             main = classToLoad.getDeclaredMethod("main", String[].class);
+            List<String> args = (List<String>) currentBenchmark.get("arguments");
         }
     }
 
@@ -114,14 +117,13 @@ public class ClassLoaderBenchmark {
 
     public static void main(String[] args) throws RunnerException, FileNotFoundException {
 
-        benchmarksInfo = loadBenchmarkSpec(Paths.get(args[0]));
-
         Options opt = new OptionsBuilder()
                 .include(ClassLoaderBenchmark.class.getSimpleName())
                 .warmupIterations(5)
                 .measurementIterations(5)
                 .threads(4)
                 .forks(1)
+                .param("fileName", args[0])
                 .shouldFailOnError(true)
                 .build();
 
