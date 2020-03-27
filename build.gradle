@@ -23,6 +23,7 @@ jar {
 
 repositories {
   jcenter()
+  mavenCentral()
 }
 
 shadowJar {
@@ -32,6 +33,7 @@ shadowJar {
 }
 
 dependencies {
+  compile 'org.json:json:20190722'
   compile 'net.time4j:time4j-core:4.38'
   compile 'org.apache.commons:commons-lang3:3.9'
   compile 'org.openjdk.jmh:jmh-core:1.22'
