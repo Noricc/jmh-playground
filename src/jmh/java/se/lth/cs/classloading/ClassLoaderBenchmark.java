@@ -3,11 +3,13 @@
 // of the benchmark.
 package se.lth.cs.classloading;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
+import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
@@ -21,9 +23,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ClassLoaderBenchmark {
 
@@ -57,79 +57,176 @@ public class ClassLoaderBenchmark {
         return classFromJar;
     }
 
-    private static Path validatePath(String jarPath) throws FileNotFoundException {
-        if (jarPath == null) {
+
+    /**
+     * A function that interrupts execution if the path does not exist
+     * if it works, the absolute path is returned.
+     * @param path
+     * @return
+     * @throws FileNotFoundException
+     */
+    private static Path validatePath(String path) throws FileNotFoundException {
+        if (path == null) {
             throw new IllegalArgumentException();
         }
-        Path jar = Paths.get(jarPath).toAbsolutePath();
+        Path absolutePath = Paths.get(path).toAbsolutePath();
 
-        if (!jar.toFile().exists()) {
-            throw new FileNotFoundException(jarPath);
+        if (!absolutePath.toFile().exists()) {
+            throw new FileNotFoundException(path);
         }
-        return jar;
+        return absolutePath;
     }
 
-    private static Map<String, Object> loadBenchmarkSpec(InputStream stream) {
+    private static JSONObject loadBenchmarkSpec(InputStream stream) {
         JSONTokener tokener = new JSONTokener(stream);
         JSONObject specification = new JSONObject(tokener);
-        return specification.toMap();
+        return specification;
     }
 
-    private static Map<String, Object> loadBenchmarkSpec(Path benchmarkSpecPath) throws FileNotFoundException {
+    private static JSONObject loadBenchmarkSpec(Path benchmarkSpecPath) throws FileNotFoundException {
         FileInputStream fs = new FileInputStream(benchmarkSpecPath.toFile());
         return loadBenchmarkSpec(fs);
+    }
+
+    private static class RunSpecRow {
+        public String classPath;
+        public String mainClass;
+        public List<String> arguments;
+        public List<String> jvmArgs;
+    }
+
+    /**
+     * Converts a benchmark specification to a specification about what JMH should run.
+     * @param benchmarkSpec
+     * @return
+     */
+    private static Map<String, RunSpecRow> benchmarkSpecToRuns(JSONObject benchmarkSpec) {
+        Map<String, RunSpecRow> runSpec = new HashMap<>();
+
+        for (String program : benchmarkSpec.keySet()) {
+            JSONObject programData = benchmarkSpec.getJSONObject(program);
+            String mainClass = programData.getString("main-class");
+            JSONObject variantsData = programData.getJSONObject("variants");
+            JSONArray argumentsData  = programData.getJSONArray("arguments");
+            // argumentsData can be parameters to JMH, all combinations should be tried.
+            for (String variant : variantsData.keySet()) {
+                JSONObject variantInfo = variantsData.getJSONObject(variant);
+                JSONArray jvmArgs = variantInfo.getJSONArray("jvm-args");
+                String classPath = variantInfo.getString("classpath");
+
+                // I think the classpath and the jvm args are both
+                // Arguments to the JVM anyway
+
+                // We add this variant specific data to the map.
+                RunSpecRow row = new RunSpecRow();
+                row.mainClass = mainClass; // To be passed as parameter
+
+                row.arguments = joinArguments(extractArguments(argumentsData)); // Cannot pass arrays as lists of parameters, needs to format them
+
+                List<String> jvmArgsList = new ArrayList<>();
+                for (int i = 0; i < jvmArgs.length(); ++i) { jvmArgsList.add(jvmArgs.getString(i)); }
+
+                row.classPath = classPath;
+
+                runSpec.put(variant, row);
+            }
+        }
+        return runSpec;
+    }
+
+    private static List<List<String>> extractArguments(JSONArray arr) {
+        List<List<String>> result = new ArrayList<>();
+
+        // Java like its 1999
+        for (int i = 0; i < arr.length(); i++) {
+            JSONArray a = arr.getJSONArray(i);
+            result.add(new ArrayList());
+            for (int j = 0; j < a.length(); ++j) {
+                result.get(i).add(a.getString(j));
+            }
+        }
+
+        return result;
+    }
+
+    private static List<String> joinArguments(List<List<String>> args) {
+        List<String> result = new ArrayList<>();
+
+        for (List<String> l : args) {
+            String s = String.join(" ", l);
+            result.add(s);
+        }
+
+        return result;
+    }
+
+    private static List<Options> createOptions(Map<String, RunSpecRow> runSpec) {
+        List<Options> options = new ArrayList<>();
+
+        for (String variant : runSpec.keySet()) {
+            ChainedOptionsBuilder optionsBuilder = new OptionsBuilder()
+                    .include(ClassLoaderBenchmark.class.getSimpleName())
+                    .warmupIterations(5)
+                    .measurementIterations(5)
+                    .threads(4)
+                    .forks(1)
+                    .shouldFailOnError(true);
+
+            RunSpecRow data = runSpec.get(variant);
+            optionsBuilder.param("benchmarkIdentifier", variant);
+            optionsBuilder.param("mainClass", data.mainClass);
+            optionsBuilder.param("classPath", data.classPath);
+
+            String[] argsArray = new String[data.arguments.size()];
+            data.arguments.toArray(argsArray);
+            optionsBuilder.param("arguments", argsArray);
+
+            options.add(optionsBuilder.build());
+        }
+
+        return options;
     }
 
     // We have a state which contains the main class of the program
     @State(Scope.Benchmark)
     public static class BenchmarkState {
 
-        public static Map<String, Object> benchmarksInfo;
-
-        @Param("FOP")
+        @Param("NOTHING")
         public String benchmarkIdentifier;
 
-        Class classToLoad;
-        Object[] arguments;
-        Method main;
+        @Param("NO-MAIN")
+        public String mainClass;
 
-        @Param("NOTHING")
-        private String fileName;
+        @Param("NO-CLASSPATH")
+        public String classPath;
+
+        @Param("NONE")
+        public String arguments;
+
+        Object[] argumentObjs;
+        Method mainMethod;
 
         public BenchmarkState() {}
 
         @Setup()
-        public void doSetup() throws NoSuchMethodException, FileNotFoundException {
-            benchmarksInfo = loadBenchmarkSpec(Paths.get(fileName));
-            Object currentBenchmark0 = benchmarksInfo.get(benchmarkIdentifier);
-            Map<String, Object> currentBenchmark = (Map<String, Object>) currentBenchmark0;
-            String jarPath = (String) currentBenchmark.get("jar-path");
-            String mainClass = (String) currentBenchmark.get("main-class");
-
-            classToLoad = loadClassFromJar(jarPath, mainClass);
-            main = classToLoad.getDeclaredMethod("main", String[].class);
-            List<Object> args = (List<Object>) currentBenchmark.get("arguments");
-            arguments = Arrays.copyOf(args.toArray(), args.size(), String[].class);
+        public void doSetup() throws NoSuchMethodException, FileNotFoundException, ClassNotFoundException {
+            Class mainC = loadClassFromJar(classPath, mainClass);
+            mainMethod = mainC.getDeclaredMethod("main", String[].class);
+            argumentObjs = arguments.split(" ");
         }
     }
 
     @Benchmark
     public void runMain(BenchmarkState state) throws InvocationTargetException, IllegalAccessException {
-        state.main.invoke(null, new String[][] {(String[]) state.arguments});
+        state.mainMethod.invoke(null, new String[][] {(String[]) state.argumentObjs});
     }
 
     public static void main(String[] args) throws RunnerException, FileNotFoundException {
 
-        Options opt = new OptionsBuilder()
-                .include(ClassLoaderBenchmark.class.getSimpleName())
-                .warmupIterations(5)
-                .measurementIterations(5)
-                .threads(4)
-                .forks(1)
-                .param("fileName", args[0])
-                .shouldFailOnError(true)
-                .build();
+        List<Options> opts = createOptions(benchmarkSpecToRuns(loadBenchmarkSpec(Paths.get(args[0]))));
 
-        new Runner(opt).run();
+        for (Options o : opts) {
+            new Runner(o).run();
+        }
     }
 }
