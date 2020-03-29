@@ -125,6 +125,9 @@ public class ClassLoaderBenchmark {
 
                 List<String> jvmArgsList = new ArrayList<>();
                 for (int i = 0; i < jvmArgs.length(); ++i) { jvmArgsList.add(jvmArgs.getString(i)); }
+                row.jvmArgs = jvmArgsList;
+
+                System.out.println(row.jvmArgs);
 
                 row.classPath = classPath;
 
@@ -166,9 +169,10 @@ public class ClassLoaderBenchmark {
         for (String variant : runSpec.keySet()) {
             ChainedOptionsBuilder optionsBuilder = new OptionsBuilder()
                     .include(ClassLoaderBenchmark.class.getSimpleName())
-                    .warmupIterations(5)
-                    .measurementIterations(5)
-                    .threads(4)
+                    .mode(Mode.SingleShotTime)
+                    .warmupIterations(2)
+                    .measurementIterations(3)
+                    .threads(1)
                     .forks(1)
                     .shouldFailOnError(true);
 
@@ -180,6 +184,10 @@ public class ClassLoaderBenchmark {
             String[] argsArray = new String[data.arguments.size()];
             data.arguments.toArray(argsArray);
             optionsBuilder.param("arguments", argsArray);
+
+            String[] jvmArgsArray = new String[data.jvmArgs.size()];
+            data.jvmArgs.toArray(jvmArgsArray);
+            optionsBuilder.jvmArgs(jvmArgsArray);
 
             options.add(optionsBuilder.build());
         }
