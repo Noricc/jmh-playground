@@ -35,7 +35,7 @@ public class ClassLoaderBenchmark {
      * @throws MalformedURLException
      * @throws ClassNotFoundException
      */
-    private static Class loadClassFromJar(String jarPath, String mainClass) throws FileNotFoundException {
+    public static Class loadClassFromJar(String jarPath, String mainClass) throws FileNotFoundException {
         Path jar = validatePath(jarPath);
 
         URLClassLoader loader = null;
