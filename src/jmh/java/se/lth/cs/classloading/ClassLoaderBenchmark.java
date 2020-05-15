@@ -172,11 +172,12 @@ public class ClassLoaderBenchmark {
         for (String variant : runSpec.keySet()) {
             ChainedOptionsBuilder optionsBuilder = new OptionsBuilder()
                     .include(ClassLoaderBenchmark.class.getSimpleName())
-                    .mode(Mode.SingleShotTime)
+                    .mode(Mode.AverageTime)
                     .warmupIterations(2)
                     .measurementIterations(3)
                     .threads(1)
                     .forks(1)
+                    .output("benchmark-output.log")
                     .shouldFailOnError(true);
 
             RunSpecRow data = runSpec.get(variant);
@@ -191,7 +192,8 @@ public class ClassLoaderBenchmark {
             String[] jvmArgsArray = new String[data.jvmArgs.size()];
             data.jvmArgs.toArray(jvmArgsArray);
             optionsBuilder.jvmArgs(jvmArgsArray);
-
+            optionsBuilder.resultFormat(ResultFormatType.JSON);
+            optionsBuilder.result("result.json");
             options.add(optionsBuilder.build());
         }
 
