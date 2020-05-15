@@ -42,3 +42,6 @@ dependencies {
 
 // Running `./gradlew` runs these tasks by default
 defaultTasks 'clean', 'shadowJar'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
