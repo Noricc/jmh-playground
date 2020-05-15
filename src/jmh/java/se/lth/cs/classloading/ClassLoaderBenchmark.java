@@ -239,11 +239,25 @@ public class ClassLoaderBenchmark {
     }
 
     public static void main(String[] args) throws RunnerException, FileNotFoundException {
+        Map<String, RunSpecRow> runsSpecs = benchmarkSpecToRuns(loadBenchmarkSpec(Paths.get(args[0])));
+        List<Options> opts = createOptions(runsSpecs);
 
-        List<Options> opts = createOptions(benchmarkSpecToRuns(loadBenchmarkSpec(Paths.get(args[0]))));
+        ArrayList<RunResult> results = new ArrayList<>();
 
         for (Options o : opts) {
-            new Runner(o).run();
+            Runner r = new Runner(o);
+            results.addAll(r.run());
+        }
+
+        for (RunResult result : results) {
+            double score = result.getAggregatedResult().getPrimaryResult().getScore();
+            double[] confidence = result.getAggregatedResult().getPrimaryResult().getScoreConfidence();
+            String variantLabel = result.getParams().getParam("benchmarkIdentifier");
+            JSONObject o = new JSONObject();
+            o.append("name", variantLabel);
+            o.append("score", score);
+            o.append("confidence", Arrays.asList(confidence));
+            System.out.println(o.toString());
         }
     }
 }
