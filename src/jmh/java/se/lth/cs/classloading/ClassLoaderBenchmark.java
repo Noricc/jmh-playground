@@ -132,8 +132,6 @@ public class ClassLoaderBenchmark {
                 for (int i = 0; i < jvmArgs.length(); ++i) { jvmArgsList.add(jvmArgs.getString(i)); }
                 row.jvmArgs = jvmArgsList;
 
-                System.out.println(row.jvmArgs);
-
                 row.classPath = classPath;
 
                 runSpec.put(variant, row);
