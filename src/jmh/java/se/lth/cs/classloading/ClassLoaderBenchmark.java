@@ -77,6 +77,11 @@ public class ClassLoaderBenchmark {
         return absolutePath;
     }
 
+    /**
+     * Function loading a benchmark specification from a JSON file
+     * @param stream of the file
+     * @returns an object describing the specification
+     */
     private static JSONObject loadBenchmarkSpec(InputStream stream) {
         JSONTokener tokener = new JSONTokener(stream);
         JSONObject specification = new JSONObject(tokener);
