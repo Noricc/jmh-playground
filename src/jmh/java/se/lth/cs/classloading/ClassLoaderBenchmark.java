@@ -7,11 +7,14 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.openjdk.jmh.annotations.*;
+import org.openjdk.jmh.results.RunResult;
+import org.openjdk.jmh.results.format.ResultFormatType;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.openjdk.jmh.runner.options.VerboseMode;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -231,7 +234,8 @@ public class ClassLoaderBenchmark {
 
     @Benchmark
     public void runMain(BenchmarkState state) throws InvocationTargetException, IllegalAccessException {
-        state.mainMethod.invoke(null, new String[][] {(String[]) state.argumentObjs});
+        System.out.println("Running: " + state.mainMethod.toString());
+        state.mainMethod.invoke(null, (Object[]) new String[][] {(String[]) state.argumentObjs});
     }
 
     public static void main(String[] args) throws RunnerException, FileNotFoundException {
